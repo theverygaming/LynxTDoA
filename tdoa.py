@@ -155,9 +155,9 @@ class TDoARun:
             lag_time, sigma2 = self._compute_recording_lags(self._recs[a], self._recs[b])
             self._rx_lags[(a, b)] = self._get_dist_probability_fn(lag_time, sigma2)
     
-    def _get_heatmap(self, recids: list[tuple[int, int]]):
+    def _get_heatmap(self, recpairs: list[tuple[int, int]]):
         m = np.copy(self._m)
-        for (a, b) in recids:
+        for (a, b) in recpairs:
             sigma2 = self._rx_lags[(a, b)]
             d1 = tools.haversine(self._latgr, self._longr, self._recs[a].lat, self._recs[a].lon)
             d2 = tools.haversine(self._latgr, self._longr, self._recs[b].lat, self._recs[b].lon)
@@ -168,9 +168,19 @@ class TDoARun:
 
         return self._heatmap_intensity(m)
 
-    def run(self):
+    def get_pairs(self):
+        self._compute_rec_lags()
+        intensities = {}
+        for recids in self._rx_lags:
+            intensities[recids] = self._get_heatmap([recids])
+        return self._latgr, self._longr, intensities
+
+    def get_all(self):
         self._compute_rec_lags()
 
         intensity = self._get_heatmap(self._rx_lags.keys())
 
         return self._latgr, self._longr, intensity
+
+    def get_rec(self, recid):
+        return self._recs[recid]
