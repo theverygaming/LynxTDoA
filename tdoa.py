@@ -59,16 +59,25 @@ class TDoAPositionedRecording(TDoARecording):
         )
 
 
-class TDoARun:
-    def __init__(self, recs: list[TDoAPositionedRecording], p1, p2, res):
-        self._recs = recs
-        self._rx_lags = {}
-        self._latgr, self._longr, self._m = self._prepare_heatmap(p1, p2, res)
+class TDoAAlgorithm:
+    # FIXME: function naming, docstrings?
 
-        if len(self._recs) < 2:
-            raise Exception(f"need at least two recordings for TDoA, got {len(self._recs)}")
+    def get_dist_probability_fn(self, r1: TDoARecording, r2: TDoARecording):
+        raise NotImplementedError()
 
-        TDoARecording.sync_recs(self._recs)
+    def probability_to_intensity(self, prob: npt.NDArray[np.float32]):
+        raise NotImplementedError()
+
+
+class TDoAAlgorithmSimple(TDoAAlgorithm):
+    def get_dist_probability_fn(self, r1: TDoARecording, r2: TDoARecording):
+        lag_time, sigma2 = self._compute_recording_lags(r1, r2)
+        return self._get_dist_probability_fn(lag_time, sigma2)
+
+    def probability_to_intensity(self, prob: npt.NDArray[np.float32]):
+        probmin = np.min(prob)
+        probmax = np.max(prob)
+        return 1.0 - (prob - probmin) / (probmax - probmin)
 
     @staticmethod
     def _compute_lags(s1, s2, sr, max_dist_m=10000*1000):
@@ -123,6 +132,19 @@ class TDoARun:
             fill_value=np.max(sigma2), # TODO: maybe just inf?
         )
         return probability_func
+        
+
+class TDoARun:
+    def __init__(self, algorithm: TDoAAlgorithm, recs: list[TDoAPositionedRecording], p1, p2, res):
+        self._algorithm = algorithm
+        self._recs = recs
+        self._rx_dist_fns = {}
+        self._latgr, self._longr, self._m = self._prepare_heatmap(p1, p2, res)
+
+        if len(self._recs) < 2:
+            raise Exception(f"need at least two recordings for TDoA, got {len(self._recs)}")
+
+        TDoARecording.sync_recs(self._recs)
 
     @staticmethod
     def _prepare_heatmap(p1, p2, res):
@@ -141,24 +163,17 @@ class TDoARun:
 
         return latgr, longr, m
 
-    @staticmethod
-    def _heatmap_intensity(m):
-        mmin = np.min(m)
-        mmax = np.max(m)
-        return 1.0 - (m - mmin) / (mmax - mmin)
-
-    def _compute_rec_lags(self):
-        if self._rx_lags:
+    def _compute_rec_dists(self):
+        if self._rx_dist_fns:
             return
 
         for a, b in itertools.combinations(range(len(self._recs)), 2):
-            lag_time, sigma2 = self._compute_recording_lags(self._recs[a], self._recs[b])
-            self._rx_lags[(a, b)] = self._get_dist_probability_fn(lag_time, sigma2)
-    
+            self._rx_dist_fns[(a, b)] = self._algorithm.get_dist_probability_fn(self._recs[a], self._recs[b])
+
     def _get_heatmap(self, recpairs: list[tuple[int, int]]):
         m = np.copy(self._m)
         for (a, b) in recpairs:
-            sigma2 = self._rx_lags[(a, b)]
+            sigma2 = self._rx_dist_fns[(a, b)]
             d1 = tools.haversine(self._latgr, self._longr, self._recs[a].lat, self._recs[a].lon)
             d2 = tools.haversine(self._latgr, self._longr, self._recs[b].lat, self._recs[b].lon)
 
@@ -166,19 +181,19 @@ class TDoARun:
 
             m += sigma2(dist)
 
-        return self._heatmap_intensity(m)
+        return self._algorithm.probability_to_intensity(m)
 
     def get_pairs(self):
-        self._compute_rec_lags()
+        self._compute_rec_dists()
         intensities = {}
-        for recids in self._rx_lags:
+        for recids in self._rx_dist_fns:
             intensities[recids] = self._get_heatmap([recids])
         return self._latgr, self._longr, intensities
 
     def get_all(self):
-        self._compute_rec_lags()
+        self._compute_rec_dists()
 
-        intensity = self._get_heatmap(self._rx_lags.keys())
+        intensity = self._get_heatmap(self._rx_dist_fns.keys())
 
         return self._latgr, self._longr, intensity
 
