@@ -186,14 +186,17 @@ class TDoARun:
         intensities = {}
         for recids in self._rx_dist_fns:
             intensities[recids] = self._get_heatmap([recids])
-        return self._latgr, self._longr, intensities
+        return intensities
 
     def get_all(self):
         self._compute_rec_dists()
 
         intensity = self._get_heatmap(self._rx_dist_fns.keys())
 
-        return self._latgr, self._longr, intensity
+        return intensity
 
     def get_rec(self, recid):
         return self._recs[recid]
+
+    def get_grid(self):
+        return self._latgr, self._longr
