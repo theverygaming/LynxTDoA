@@ -39,6 +39,7 @@
             # libraries used
             python313Packages.numpy
             python313Packages.scipy
+            python313Packages.matplotlib
           ];
         };
       }
