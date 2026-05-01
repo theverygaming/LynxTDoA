@@ -13,7 +13,7 @@ class TDoARecording:
     # nanosecond timestamps for each sample in samples
     timestamps: npt.NDArray[np.int64]
     # sample rate
-    sr: float
+    sr: float # TODO: maybe compute this from timestamps and cache it?
 
     @staticmethod
     def sync_recs(recs: list["TDoARecording"], time_diff_max_ns=2e9):
@@ -38,6 +38,22 @@ class TDoARecording:
         for i, rec in enumerate(recs):
             recs[i].timestamps = rec.timestamps[:smallest_len]
             recs[i].samples = rec.samples[:smallest_len]
+
+    def split(self, max_secs):
+        max_dt_ns = int(max_secs * 1e9)
+        samples = self.samples
+        timestamps = self.timestamps
+        splits = []
+        while True:
+            (indicies,) = np.asarray(timestamps >= timestamps[0] + max_dt_ns).nonzero()
+            if len(indicies) == 0:
+                splits.append(dataclasses.replace(self, samples=samples, timestamps=timestamps))
+                break
+            idx = indicies[0]
+            splits.append(dataclasses.replace(self, samples=samples[:idx], timestamps=timestamps[:idx]))
+            samples = samples[idx:]
+            timestamps = timestamps[idx:]
+        return splits
 
 
 @dataclasses.dataclass
