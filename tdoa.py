@@ -55,6 +55,15 @@ class TDoARecording:
             timestamps = timestamps[idx:]
         return splits
 
+    def cut(self, start: float, end: float):
+        """
+        Cut a recording to a timeframe from start to end (in seconds)
+        """
+        s_start = int(self.sr * start)
+        s_end = int(self.sr * end)
+        self.samples = self.samples[s_start:s_end]
+        self.timestamps = self.timestamps[s_start:s_end]
+
 
 @dataclasses.dataclass
 class TDoAPositionedRecording(TDoARecording):
@@ -102,6 +111,13 @@ class TDoAAlgorithmSimple(TDoAAlgorithm):
         # this is in essence similar to
         # https://github.com/hcab14/TDoA/blob/2bb9dc2ecc2c6ebcc13ed11c7cbeadea0cd5dfcd/m/tdoa_compute_lags_new.m#L20-L28
         # and ofc strongly inspired by that
+
+        # get phase
+        #s1 = np.angle(s1) / (2 * np.pi)
+        #s2 = np.angle(s2) / (2 * np.pi)
+        # get magnitude (AM demod)
+        # s1 = np.abs(s1)
+        # s2 = np.abs(s2)
 
         corr = scipy.signal.correlate(s1, s2, mode="full")
 
@@ -161,6 +177,9 @@ class TDoARun:
             raise Exception(f"need at least two recordings for TDoA, got {len(self._recs)}")
 
         TDoARecording.sync_recs(self._recs)
+
+        for r in self._recs:
+            r.resample(100, 1)
 
     @staticmethod
     def _prepare_heatmap(p1, p2, res):
