@@ -75,6 +75,12 @@ class TDoARecording:
             self.timestamps,
         )
 
+    def plot_spectrogram(self, fig, ax):
+        _, _, _, im = ax.specgram(self.samples, NFFT=int(self.sr / 10), Fs=self.sr, scale="dB", vmin=-100, cmap="viridis")
+        fig.colorbar(im, ax=ax, orientation="vertical", label="Spectral Density (dBFS)")
+        ax.set_xlabel("Time (Seconds)")
+        ax.set_ylabel("Frequency (Hz)")
+
 @dataclasses.dataclass
 class TDoAPositionedRecording(TDoARecording):
     lat: float
