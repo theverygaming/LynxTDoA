@@ -117,7 +117,11 @@ class TDoAAlgorithmSimple(TDoAAlgorithm):
         lag_time, score = self._compute_recording_lags(r1, r2)
         def get_corr():
             return lag_time, score
-        return self._get_dist_score_fn(lag_time, score), get_corr
+        # convert seconds lag to distance in m
+        lag_dist = lag_time * scipy.constants.c
+        # TODO: maybe do some magic to obtain a more accurate measurement even when the resulution is bad?
+        peak_dist = lag_dist[np.argmax(score)]
+        return self._get_dist_score_fn(lag_dist, score), get_corr, peak_dist
 
     def score_to_intensity(self, score: npt.NDArray[np.float32]):
         scoremin = np.min(score)
@@ -172,12 +176,10 @@ class TDoAAlgorithmSimple(TDoAAlgorithm):
         return lag_time, score
 
     @staticmethod
-    def _get_dist_score_fn(lag_time, score):
-        # convert seconds lag to distance in m
-        lag_time *= scipy.constants.c
+    def _get_dist_score_fn(lag_dist, score):
         # function that will, given a distance in meters return the score at that point
         return scipy.interpolate.interp1d(
-            lag_time,
+            lag_dist,
             score,
             bounds_error=False,
             fill_value=np.min(score),
