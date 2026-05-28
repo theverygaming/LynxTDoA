@@ -100,12 +100,17 @@ def gen_am(f_carrier, fs, len_s):
     return t, sig
 
 def gen_fsk(f_carrier, shift, baudrate, fs, len_s):
+    messages = [
+        b"The quick brown fox jumps over the lazy dog :3",
+        b"meow mrrp maoow woof :3 tehee",
+    ]
+    msg_bytes = b"".join([m + bytes([0] * int(baudrate / 8) * 15) for m in messages])
     t = np.arange(0, len_s, 1 / fs)
     sig = fm(
         t,
         f_carrier,
         np.pad(
-            (md := mod_data(int(fs*(1/baudrate)), b"The quick brown fox jumps over the lazy dog :3" + bytes(np.zeros(1)), {0: -1, 1: -1})[:len(t)]),
+            (md := mod_data(int(fs*(1/baudrate)), msg_bytes, {0: -1, 1: -1})[:len(t)]),
             (0, len(t) - len(md)),
             mode="wrap",
         ),
