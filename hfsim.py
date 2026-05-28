@@ -123,8 +123,11 @@ def gen_tdoa_recs(
     rx_params: list[str, tuple[tuple[float, float]]],
     out_fs = 12000,
 ) -> list[tdoa.TDoAPositionedRecording]:
+    # FIXME: don't calculate the delay twice lol
+    max_delay_samps = max([round(fs * (tools.haversine(*tx_position, *rx[1]) / scipy.constants.c)) for rx in rx_params])
+    print(f"max delay: {max_delay_samps}")
     # TODO: random fading parameters
-    def gen_rec(rxname, rx_position):
+    def gen_rec(rxname, rx_position, noise_db):
         dist_m = tools.haversine(*tx_position, *rx_position)
         delay_samps = round(fs * (dist_m / scipy.constants.c))
         print(f"delay: {delay_samps}")
@@ -133,13 +136,16 @@ def gen_tdoa_recs(
         s = hf_path(t, s, delay_samps, fade_strength=0)
         s = normalize(s)
 
+        # remove max. delay from start because the delay messes up the start of the signal
+        tn = t[max_delay_samps:]
+        s = s[max_delay_samps:]
+
         # Add noise
-        noise_db = 0
-        s += noise(t) * (10 ** (noise_db / 10))
+        s += noise(tn) * (10 ** (noise_db / 10))
         s = normalize(s)
 
         # tune the signal aroud 0
-        s = normalize(vfo(t, s, fs, signal_fcenter, signal_pbw))
+        s = normalize(vfo(tn, s, fs, signal_fcenter, signal_pbw))
 
         # resample
         frac = fractions.Fraction(out_fs / fs).limit_denominator(20)
