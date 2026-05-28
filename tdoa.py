@@ -129,9 +129,12 @@ class TDoAAlgorithmSimple(TDoAAlgorithm):
         # get phase
         #s1 = np.angle(s1) / (2 * np.pi)
         #s2 = np.angle(s2) / (2 * np.pi)
-        # get magnitude (AM demod)
+        # get magnitude and remove DC (AM demod)
         # s1 = np.abs(s1)
         # s2 = np.abs(s2)
+        # sos = scipy.signal.butter(4, 0.1, "hp", fs=sr, output="sos")
+        # s1 = scipy.signal.sosfiltfilt(sos, s1)
+        # s2 = scipy.signal.sosfiltfilt(sos, s2)
 
         # remove any constant DC offsets
         s1 -= np.mean(s1)
