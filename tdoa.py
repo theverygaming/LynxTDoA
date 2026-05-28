@@ -122,6 +122,13 @@ class TDoAAlgorithmSimple(TDoAAlgorithm):
 
     @staticmethod
     def _compute_lags(s1, s2, sr, max_dist_m):
+        def demod_fm(sig, bandwidth, samplerate):
+            # https://github.com/AlexandreRouma/SDRPlusPlus/blob/36ea9a143422f5b374371461667ff53fb9387300/core/src/dsp/demod/quadrature.h
+            inv_deviation = 2 * np.pi * ((bandwidth / 2) / samplerate)
+            phase = np.angle(sig) # np.angle is equal to np.arctan2(im, re)
+            demod = np.diff(np.unwrap(phase) / inv_deviation)
+            return demod
+
         # this is in essence similar to
         # https://github.com/hcab14/TDoA/blob/2bb9dc2ecc2c6ebcc13ed11c7cbeadea0cd5dfcd/m/tdoa_compute_lags_new.m#L20-L28
         # and ofc strongly inspired by that
@@ -135,6 +142,9 @@ class TDoAAlgorithmSimple(TDoAAlgorithm):
         # sos = scipy.signal.butter(4, 0.1, "hp", fs=sr, output="sos")
         # s1 = scipy.signal.sosfiltfilt(sos, s1)
         # s2 = scipy.signal.sosfiltfilt(sos, s2)
+        # FM demod
+        # s1 = demod_fm(s1, 1, 1)
+        # s2 = demod_fm(s2, 1, 1)
 
         # remove any constant DC offsets
         s1 -= np.mean(s1)
