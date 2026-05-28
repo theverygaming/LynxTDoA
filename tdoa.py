@@ -115,7 +115,9 @@ class TDoAAlgorithmSimple(TDoAAlgorithm):
 
     def get_dist_score_fn(self, r1: TDoARecording, r2: TDoARecording):
         lag_time, score = self._compute_recording_lags(r1, r2)
-        return self._get_dist_score_fn(lag_time, score)
+        def get_corr():
+            return lag_time, score
+        return self._get_dist_score_fn(lag_time, score), get_corr
 
     def score_to_intensity(self, score: npt.NDArray[np.float32]):
         scoremin = np.min(score)
@@ -235,7 +237,7 @@ class TDoARun:
 
             dist = d1 - d2
 
-            score += self._rx_dist_fns[(a, b)](dist)
+            score += self._rx_dist_fns[(a, b)][0](dist)
 
         return self._algorithm.score_to_intensity(score)
 
@@ -265,3 +267,11 @@ class TDoARun:
         """
         sr = np.mean([r.sr for r in self._recs])
         return (1 / sr) * scipy.constants.c
+
+    def plot_correlation(self, fig, ax, rxid1, rxid2):
+        self._compute_rec_dists()
+        lag_time, score = self._rx_dist_fns[(rxid1, rxid2)][1]()
+        intensity = self._algorithm.score_to_intensity(score)
+        ax.plot(lag_time, intensity)
+        ax.set_xlabel("Lag (Seconds)")
+        ax.set_ylabel("Intensity")
