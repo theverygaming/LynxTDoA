@@ -250,6 +250,8 @@ class TDoARun:
 
             intensity += self._rx_dist_fns[(a, b)][0](dist)
 
+        intensity /= np.max([1.0, np.max(intensity)])
+
         return intensity
 
     def get_pairs(self):
