@@ -127,7 +127,7 @@ class TDoAAlgorithmSimple(TDoAAlgorithm):
             inv_deviation = 2 * np.pi * ((bandwidth / 2) / samplerate)
             phase = np.angle(sig) # np.angle is equal to np.arctan2(im, re)
             demod = np.diff(np.unwrap(phase) / inv_deviation)
-            return demod
+            return np.pad(demod, (1, 0), mode="edge")
 
         # this is in essence similar to
         # https://github.com/hcab14/TDoA/blob/2bb9dc2ecc2c6ebcc13ed11c7cbeadea0cd5dfcd/m/tdoa_compute_lags_new.m#L20-L28
