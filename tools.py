@@ -14,3 +14,27 @@ def haversine(lat1, lon1, lat2, lon2):
     c = 2 * np.asin(np.sqrt(a))
 
     return EARTH_RADIUS_M * c
+
+def crossambiguity(csa, csb, fs, fbw, fres, corrfn, corrlags):
+    """
+    csa: complex input signal A
+    csb: complex input signal B
+    fs: sampling frequency
+    fbw: bandwidth in Hz to measure frequency shift in
+    freq: frequency resolution in Hz
+    corrfn: correlation function fn(csa, csb) -> intensities
+    corrlags: computed correlation lags (lengh same as intensities from correlation function)
+    """
+    freqs = np.linspace(-(fbw / 2), fbw / 2, int(np.ceil(fbw / max(fres, fs / len(csa)))) + 1)
+    matrix = np.zeros((len(freqs), len(corrlags)))
+
+    t = np.arange(len(csa)) / fs
+    for i, fd in enumerate(freqs):
+        # shift by fd
+        shifted = csb * np.exp(-1j * 2 * np.pi * fd * t)
+
+        matrix[i, :] = corrfn(csa, shifted)
+
+        print(f"{i+1}/{len(freqs)}")
+
+    return matrix, freqs
