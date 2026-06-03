@@ -29,7 +29,7 @@ class TDoARecording:
             diff = np.absolute(rec.timestamps - latest_start)
             min_idx = diff.argmin()
             if diff[min_idx] > time_diff_max_ns:
-                raise Exception(f"recs are desynced by more than time_diff_max_ns ({time_diff_max_ns} ns) from each other ({diff[min_idx]} ns)")
+                raise Exception(f"recs ({rec}) are desynced by more than time_diff_max_ns ({time_diff_max_ns} ns) from each other ({diff[min_idx]} ns)")
             if diff[min_idx] > time_diff_warn_ns:
                 print(f"WARNING: sync_recs: diff {diff[min_idx]} ns ({((diff[min_idx] / 1e9) * scipy.constants.c) / 1000} km)")
             recs[i].timestamps = rec.timestamps[min_idx:]
