@@ -3,12 +3,12 @@ import numpy as np
 from tdoa import TDoARecording
 
 
-def _read_chunk(data):
+def _read_chunk(f, data):
     ctype, lchunk = struct.unpack_from("<4sI", data)
     match ctype:
         case b"kiwi":
             if lchunk != 10:
-                raise Exception("invalid kiwi chunk length")
+                raise Exception(f"{f}: invalid kiwi chunk length")
             gps_last, dummy, gpssec, gpsnsec = struct.unpack_from("<BBII", data, offset=8)
             cdata = {
                 "chunk_type": "kiwi",
@@ -19,13 +19,13 @@ def _read_chunk(data):
         case b"data":
             data = data[8:8+lchunk]
             if len(data) != lchunk:
-                raise Exception("data chunk too short")
+                raise Exception(f"{f}: data chunk too short")
             cdata = {
                 "chunk_type": "data",
                 "data": data,
             }
         case _:
-            raise Exception(f"unknown chunk type {ctype}")
+            raise Exception(f"{f}: unknown chunk type {ctype}")
     return (4 + 4 + lchunk, cdata)
 
 def read_kiwiwav(f):
@@ -48,11 +48,11 @@ def read_kiwiwav(f):
     chunks_raw = []
     ridx = 36
     while ridx < len(data):
-        cl, cdata1 = _read_chunk(data[ridx:])
+        cl, cdata1 = _read_chunk(f, data[ridx:])
         ridx += cl
         if cdata1["chunk_type"] != "kiwi":
             raise Exception(f"{f}: expected kiwi chunk")
-        cl, cdata2 = _read_chunk(data[ridx:])
+        cl, cdata2 = _read_chunk(f, data[ridx:])
         ridx += cl
         if cdata2["chunk_type"] != "data":
             raise Exception(f"{f}: expected data chunk")
