@@ -161,7 +161,7 @@ class TDoAAlgorithmSimple(TDoAAlgorithm):
         lag_dist = lag_time * scipy.constants.c
         # TODO: maybe do some magic to obtain a more accurate measurement even when the resulution is bad?
         peak_dist = lag_dist[np.argmax(intensity)]
-        return self._get_dist_intensity_fn(lag_dist, intensity), get_corr, peak_dist
+        return self._get_dist_intensity_fn(lag_dist, intensity), get_corr, peak_dist, self._rate_corr(intensity)
 
     def _compute_lags(self, s1, s2, sr, max_dist_m):
         # this is in essence similar to
@@ -218,6 +218,24 @@ class TDoAAlgorithmSimple(TDoAAlgorithm):
             bounds_error=False,
             fill_value=np.min(intensity),
         )
+
+    def _rate_corr(self, correlation):
+        peaks, peak_properties = scipy.signal.find_peaks(correlation, height=0, prominence=0, width=0)
+        if len(peaks) == 0:
+            return 0
+
+        # identify main peak
+        main_peak_idx = np.argmax(peak_properties["peak_heights"])
+        main_peak_prominence = peak_properties["prominences"][main_peak_idx]
+        main_peak_width = max(peak_properties["widths"][main_peak_idx], 1) / len(correlation)
+
+        # find peaks at least a quarter as tall as the main one
+        height_threshold = peak_properties["peak_heights"][main_peak_idx] / 4
+        n_peaks = np.sum(peak_properties["peak_heights"] >= height_threshold)
+
+        score = float(np.round(main_peak_prominence / (main_peak_width * n_peaks), 4))
+
+        return score
 
 
 class TDoARun:
