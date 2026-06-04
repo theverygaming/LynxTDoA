@@ -215,20 +215,36 @@ class TDoAAlgorithmSimple(TDoAAlgorithm):
 
 
 class TDoARun:
-    def __init__(self, algorithm: TDoAAlgorithm, recs: list[TDoAPositionedRecording], ref_rec_idx: None | int, p1, p2, res):
+    def __init__(self, algorithm: TDoAAlgorithm, recs: list[TDoAPositionedRecording], ref_rec_idx: None | int, p1, p2):
         self._algorithm = algorithm
         self._recs = recs
         self._ref_rec_idx = ref_rec_idx
         self._rx_dist_fns = {}
-        self._latgr, self._longr, self._intensity_template = self._prepare_heatmap(p1, p2, res)
 
         if len(self._recs) < 2:
             raise Exception(f"need at least two recordings for TDoA, got {len(self._recs)}")
 
-        TDoARecording.sync_recs(self._recs)
+        # for r in self._recs:
+        #     r.resample(10, 1)
 
-        for r in self._recs:
-            r.resample(100, 1)
+        # calculate needed resolution in degrees to represent max resolution
+        distance_per_degree_lat = (2 * np.pi * tools.EARTH_RADIUS_M) / 360
+        res_m = self.get_max_res()
+        lat_min = min([p1[0], p2[0]])
+        lat_max = max([p1[0], p2[0]])
+        # equator cross?
+        if lat_min <= 0 and 0 <= lat_max:
+            max_res_lat = 0
+        else:
+            max_res_lat = lat_min if abs(lat_min) < abs(lat_max) else lat_max
+        res_deg = res_m / (distance_per_degree_lat * np.cos(np.radians(max_res_lat)))
+        # beautify the number a litle
+        res_deg = tools.dynamic_round(res_deg, 3)
+        print(f"heatmap resolution in degrees {res_deg} to represent max resolution in meters {res_m}")
+
+        self._latgr, self._longr, self._intensity_template = self._prepare_heatmap(p1, p2, res_deg)
+
+        TDoARecording.sync_recs(self._recs)
 
     @staticmethod
     def _prepare_heatmap(p1, p2, res):

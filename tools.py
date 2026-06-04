@@ -1,3 +1,4 @@
+import decimal
 import numpy as np
 
 # radius of earth in meters
@@ -38,3 +39,12 @@ def crossambiguity(csa, csb, fs, fbw, fres, corrfn, corrlags):
         print(f"{i+1}/{len(freqs)}")
 
     return matrix, freqs
+
+def dynamic_round(x, ndigits):
+    d = decimal.Decimal(str(x))
+    if d == 0:
+        return x
+
+    exponent = d.adjusted()
+    tgt_res = decimal.Decimal("10") ** (exponent - (ndigits - 1))
+    return float(d.quantize(tgt_res, rounding=decimal.ROUND_DOWN))
