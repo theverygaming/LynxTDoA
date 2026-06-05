@@ -100,6 +100,51 @@ class TDoARecording:
         ax.set_xlabel("Time (Seconds)")
         ax.set_ylabel("Frequency (Hz)")
 
+    @classmethod
+    def stitch(cls, recs: list["TDoARecording"], noise=True):
+        """
+        Stitch multiple recordings together into one, fill spaces with null data
+        """
+        sr_median = np.median([rec.sr for rec in recs])
+        for rec in recs:
+            if abs(sr_median - rec.sr) > (sr_median / 100):
+                raise Exception(f"stitch: recording {rec} has out of line sample rate {rec.sr}")
+
+        recs_sorted = sorted(recs, key=lambda x: x.timestamps[0])
+
+        sample_dt_ns = int((1 / sr_median) * 1e9)
+        samples = []
+        timestamps = []
+        ts_last_end = recs_sorted[0].timestamps[0] - sample_dt_ns
+        for rec in recs_sorted:
+            # fill in gap with zeros if needed
+            dt = rec.timestamps[0] - ts_last_end # dt should always be zero or positive since we sorted the recs
+            if dt < sample_dt_ns:
+                raise Exception("stitch: there is less than one sample of spacing betwen this and the previous recording")
+            space_samples = int(round(dt / sample_dt_ns))
+            if space_samples > 1:
+                space_samples -= 1
+                if noise:
+                    samples.append(np.random.uniform(-1e-12, 1e-12, space_samples * 2).astype(np.float32).view(np.complex64))
+                else:
+                    samples.append(np.zeros(space_samples, dtype=np.complex64))
+                timestamps.append(ts_last_end + sample_dt_ns + (np.arange(space_samples, dtype=np.int64) * sample_dt_ns))
+            samples.append(rec.samples)
+            timestamps.append(rec.timestamps)
+            ts_last_end = rec.timestamps[-1]
+
+        samples = np.concatenate(samples)
+        timestamps = np.concatenate(timestamps)
+        assert len(samples) == len(timestamps)
+
+        return cls(
+            samples=samples,
+            timestamps=timestamps,
+            sr=sr_median,
+            **{k: v for k, v in dataclasses.asdict(recs_sorted[0]).items() if k not in ["samples", "timestamps", "sr"]},
+        )
+
+
 @dataclasses.dataclass
 class TDoAPositionedRecording(TDoARecording):
     lat: float
