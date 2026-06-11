@@ -310,8 +310,9 @@ class TDoARun:
         if len(self._recs) < 2:
             raise Exception(f"need at least two recordings for TDoA, got {len(self._recs)}")
 
-        # for r in self._recs:
+        # for i, r in enumerate(self._recs):
         #     r.resample(10, 1)
+        #     print(f"resampling {i}/{len(self._recs)}")
 
         # calculate needed resolution in degrees to represent max resolution
         distance_per_degree_lat = (2 * np.pi * tools.EARTH_RADIUS_M) / 360
