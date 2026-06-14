@@ -13,6 +13,7 @@ import kiwiwavreader
 import tools
 import tdoa
 import hfsim
+import ionomodel
 
 def prepare_recs(recs: list[tdoa.TDoAPositionedRecording]):
     recs_stitch = {}
@@ -111,6 +112,7 @@ def run_tdoa(
     p2: tuple[float, float],
     demod: str | None = None,
     split_secs: int | None = None,
+    propmodel: ionomodel.PropModel | None = None,
     markers: dict[str, tuple[tuple[float, float], str]] | None = None
 ):
     if markers is None:
@@ -127,6 +129,7 @@ def run_tdoa(
     tdoa_algo = tdoa.TDoAAlgorithmSimple()
 
     intensity_split = None
+    intensity_split_corrected = None
     if split_secs is not None:
         print("running split TDoA")
         tdoa.TDoARecording.sync_recs(recordings)
@@ -136,8 +139,12 @@ def run_tdoa(
             tdoa_run = tdoa.TDoARun(tdoa_algo, recs, None, p1, p2, demod=demod)
             if intensity_split is not None:
                 intensity_split += tdoa_run.get_all()
+                if propmodel is not None:
+                    intensity_split_corrected += tdoa_run.get_all_corrected(propmodel)
             else:
                 intensity_split = tdoa_run.get_all()
+                if propmodel is not None:
+                    intensity_split_corrected = tdoa_run.get_all_corrected(propmodel)
         intensity_split /= len(recordings_split)
 
     print("running TDoA")
@@ -146,13 +153,19 @@ def run_tdoa(
     latgr, longr = tdoa_run.get_grid()
     intensity = tdoa_run.get_all()
     intensities = tdoa_run.get_pairs()
+    if propmodel is not None:
+        intensity_corrected = tdoa_run.get_all_corrected(propmodel)
 
     def gen_rec_markers(recs):
         return {rec.name if rec.name is not None else "unknown": ((rec.lat, rec.lon), "blue") for rec in recs}
 
     _plot_tdoa_heatmap("out/", latgr, longr, intensity, "TDoA", markers | gen_rec_markers(recordings))
+    if propmodel is not None:
+        _plot_tdoa_heatmap("out/", latgr, longr, intensity_corrected, "TDoA (corrected)", markers | gen_rec_markers(recordings))
     if intensity_split is not None:
         _plot_tdoa_heatmap("out/", latgr, longr, intensity_split, "TDoA (split)", markers | gen_rec_markers(recordings))
+        if propmodel is not None:
+            _plot_tdoa_heatmap("out/", latgr, longr, intensity_split_corrected, "TDoA (split, corrected)", markers | gen_rec_markers(recordings))
 
     for (r1id, r2id), intensity in intensities.items():
         rec1 = tdoa_run.get_rec(r1id)
@@ -167,14 +180,16 @@ def run_tdoa(
         plt.close()
 
 if __name__ == "__main__":
-    if len(sys.argv) != 8:
-        print(f"usage: {sys.argv[0]} <lat top left> <lon top left> <lat bottom right> <lon bottom right> <demod type or 'none'> <split seconds or 0 for no split> <kiwirecorder dir>")
+    if len(sys.argv) != 10:
+        print(f"usage: {sys.argv[0]} <lat top left> <lon top left> <lat bottom right> <lon bottom right> <demod type or 'none'> <split seconds or 0 for no split> <virtual height of ionosphere (or 0)> <minimum takeoff angle for prop model (or 0)> <kiwirecorder dir>")
         exit(1)
     p1 = (float(sys.argv[1]), float(sys.argv[2]))
     p2 = (float(sys.argv[3]), float(sys.argv[4]))
     demod = sys.argv[5] if sys.argv[5].lower() != "none" else None
     split_secs = int(sys.argv[6]) if int(sys.argv[6]) != 0 else None
-    kiwirecorder_dir = sys.argv[7]
+    propmodel_vh = float(sys.argv[7]) if float(sys.argv[7]) != 0 else None
+    propmodel_min_angle = float(sys.argv[8])
+    kiwirecorder_dir = sys.argv[9]
 
     recordings = _recs_from_kiwirecorder_dir(kiwirecorder_dir)
     recordings = prepare_recs(recordings)
@@ -184,5 +199,6 @@ if __name__ == "__main__":
         p2,
         demod=demod,
         split_secs=split_secs,
+        propmodel=ionomodel.SuperSimplePropModel(propmodel_vh, propmodel_min_angle) if propmodel_vh is not None else None,
         markers=None,
     )

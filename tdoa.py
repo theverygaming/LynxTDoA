@@ -5,6 +5,7 @@ import numpy as np
 import numpy.typing as npt
 import scipy
 import tools
+import ionomodel
 
 
 @dataclasses.dataclass
@@ -409,6 +410,25 @@ class TDoARun:
             rec_ratings[k] = np.mean(rec_ratings[k])
         for name, rating in sorted([(self._recs[k].name, s) for k, s in rec_ratings.items()], key=lambda x: x[1], reverse=True):
             print(f"rx '{name}' rating {rating}")
+
+        return intensity
+
+    def get_all_corrected(self, propmodel: ionomodel.PropModel):
+        intensity = np.copy(self._intensity_template)
+
+        dmax = tools.haversine(np.max(self._latgr), np.min(self._longr), np.min(self._latgr), np.max(self._longr))
+        recpairs = self._rx_dist_fns.keys()
+        for i, (a, b) in enumerate(recpairs):
+            d1 = propmodel.hop_distance(self._latgr, self._longr, self._recs[a].lat, self._recs[a].lon)
+            d2 = propmodel.hop_distance(self._latgr, self._longr, self._recs[b].lat, self._recs[b].lon)
+
+            path_dist = d1 - d2
+            measured_path_dist = self._rx_dist_fns[(a, b)][2]
+
+            corr_rating = self._rx_dist_fns[(a, b)][3]
+
+            intensity += (dmax - np.abs(path_dist - measured_path_dist)) * corr_rating
+            print(f"computed corrected heatmap {i+1}/{len(recpairs)}")
 
         return intensity
 
