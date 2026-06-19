@@ -1,4 +1,4 @@
-# TDoA
+# LynxTDoA
 
 _(experimental) TDoA program_
 

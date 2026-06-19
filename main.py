@@ -218,7 +218,7 @@ def run_tdoa(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="TDoA program",
+        description="LynxTDoA",
     )
     parser.add_argument("--p1", help="top left map boundary (format: lat,lon e.g. 42.1, -123.4)", type=str, required=True)
     parser.add_argument("--p2", help="bottom right map boundary (format: lat,lon e.g. 32.1, -87.65)", type=str, required=True)
