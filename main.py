@@ -155,6 +155,8 @@ def run_tdoa(
     intensities = tdoa_run.get_pairs()
     if propmodel is not None:
         intensity_corrected = tdoa_run.get_all_corrected(propmodel)
+    else:
+        intensity_corrected = None
 
     def gen_rec_markers(recs):
         return {rec.name if rec.name is not None else "unknown": ((rec.lat, rec.lon), "blue") for rec in recs}
@@ -178,6 +180,16 @@ def run_tdoa(
         plt.tight_layout()
         plt.savefig(f"out/TDoA {rec1.name} - {rec2.name} correlation.png")
         plt.close()
+
+    return (
+        latgr,
+        longr,
+        intensity,
+        intensity_corrected,
+        intensity_split,
+        intensity_split_corrected,
+    )
+
 
 if __name__ == "__main__":
     if len(sys.argv) != 10:
