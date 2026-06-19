@@ -91,7 +91,7 @@ def _plot_tdoa_heatmap(out, latgr, longr, intensity, title, markers, mark_max=Tr
         ax = plt.axes(projection=ccrs.PlateCarree())
         img = ax.contourf(longr, latgr, intensity, levels=50, cmap="viridis", transform=ccrs.PlateCarree())
 
-        ax.set_aspect("auto")
+        ax.set_aspect("equal")
         gl = ax.gridlines(draw_labels=True, dms=False, x_inline=False, y_inline=False)
         gl.top_labels = False
         gl.right_labels = False
@@ -100,6 +100,7 @@ def _plot_tdoa_heatmap(out, latgr, longr, intensity, title, markers, mark_max=Tr
         ax.add_feature(cfeature.COASTLINE, edgecolor="white", linewidth=1)
     else:
         ax = plt.gca()
+        ax.set_aspect("equal")
         img = ax.contourf(longr, latgr, intensity, levels=50, cmap="viridis")
     ax.set_xlim(np.min(longr), np.max(longr))
     ax.set_ylim(np.min(latgr), np.max(latgr))
@@ -123,6 +124,7 @@ def _plot_tdoa_heatmap(out, latgr, longr, intensity, title, markers, mark_max=Tr
         mark(mlat, mlon, mcolor, mname, mname)
 
     ax.legend()
+    plt.tight_layout()
 
     plt.savefig(f"{out}{title}.png")
     plt.close()
