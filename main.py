@@ -163,23 +163,23 @@ def run_tdoa(
             print(f"split running {i+1}/{len(recordings_split)}")
             tdoa_run = tdoa.TDoARun(tdoa_algo, recs, None, p1, p2, demod=demod)
             if intensity_split is not None:
-                intensity_split += tdoa_run.get_all()
+                intensity_split += tdoa_run.get_all(None)
                 if propmodel is not None:
-                    intensity_split_corrected += tdoa_run.get_all_corrected(propmodel)
+                    intensity_split_corrected += tdoa_run.get_all(propmodel)
             else:
-                intensity_split = tdoa_run.get_all()
+                intensity_split = tdoa_run.get_all(None)
                 if propmodel is not None:
-                    intensity_split_corrected = tdoa_run.get_all_corrected(propmodel)
+                    intensity_split_corrected = tdoa_run.get_all(propmodel)
         intensity_split /= len(recordings_split)
 
     print("running TDoA")
     tdoa_run = tdoa.TDoARun(tdoa_algo, recordings, None, p1, p2, demod=demod)
     print(f"max TDoA resolution: {tdoa_run.get_max_res()}m")
     latgr, longr = tdoa_run.get_grid()
-    intensity = tdoa_run.get_all()
+    intensity = tdoa_run.get_all(None)
     intensities = tdoa_run.get_pairs()
     if propmodel is not None:
-        intensity_corrected = tdoa_run.get_all_corrected(propmodel)
+        intensity_corrected = tdoa_run.get_all(propmodel)
     else:
         intensity_corrected = None
 

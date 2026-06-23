@@ -391,8 +391,11 @@ class TDoARun:
             intensities[recids] = self._get_heatmap([recids])
         return intensities
 
-    def get_all(self):
+    def get_all(self, propmodel: ionomodel.PropModel | None):
         self._compute_rec_dists()
+
+        if propmodel is not None:
+            return self._get_all_corrected(propmodel)
 
         intensity = self._get_heatmap(self._rx_dist_fns.keys())
 
@@ -413,7 +416,7 @@ class TDoARun:
 
         return intensity
 
-    def get_all_corrected(self, propmodel: ionomodel.PropModel):
+    def _get_all_corrected(self, propmodel: ionomodel.PropModel):
         intensity = np.copy(self._intensity_template)
 
         dmax = tools.haversine(np.max(self._latgr), np.min(self._longr), np.min(self._latgr), np.max(self._longr))
