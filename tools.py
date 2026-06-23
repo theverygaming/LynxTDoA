@@ -1,3 +1,4 @@
+import itertools
 import decimal
 import numpy as np
 
@@ -48,3 +49,8 @@ def dynamic_round(x, ndigits):
     exponent = d.adjusted()
     tgt_res = decimal.Decimal("10") ** (exponent - (ndigits - 1))
     return float(d.quantize(tgt_res, rounding=decimal.ROUND_DOWN))
+
+def iter_chunks(it, chunksize):
+    # https://stackoverflow.com/a/22045226
+    it = iter(it)
+    return iter(lambda: list(itertools.islice(it, chunksize)), [])

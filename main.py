@@ -7,9 +7,11 @@ import json
 import io
 import traceback
 import base64
+import math
 import numpy as np
 import scipy
 import matplotlib.pyplot as plt
+import matplotlib.backends.backend_pdf
 
 try:
     import cartopy.crs as ccrs
@@ -84,52 +86,68 @@ def _recs_from_kiwirecorder_dir(dir: str, wavs: list[str] | None = None):
 
     return _recs_from_files(files, locs)
 
-def _plot_tdoa_heatmap(out, latgr, longr, intensity, title, markers, mark_max=True):
-    # TODO: maybe support OSM output? https://wiki.openstreetmap.org/wiki/Heat_maps
+def calc_nrows(ncols, nitems):
+    nrows = math.ceil(nitems / ncols)
+    return nrows
 
-    plt.figure(figsize=(16, 12))
-    if HAS_CARTOPY:
-        ax = plt.axes(projection=ccrs.PlateCarree())
-        img = ax.contourf(longr, latgr, intensity, levels=50, cmap="viridis", transform=ccrs.PlateCarree())
-
-        ax.set_aspect("equal")
-        gl = ax.gridlines(draw_labels=True, dms=False, x_inline=False, y_inline=False)
-        gl.top_labels = False
-        gl.right_labels = False
-
-        ax.add_feature(cfeature.BORDERS, linestyle="-", edgecolor="white", linewidth=1)
-        ax.add_feature(cfeature.COASTLINE, edgecolor="white", linewidth=1)
+def _run_tdoa_heatmap_plot(intensities, ncols, use_cartopy):
+    if len(intensities) == 1:
+        ncols = 1
+    nrows = calc_nrows(ncols, len(intensities))
+    if HAS_CARTOPY and use_cartopy:
+        fig, axs = plt.subplots(ncols=ncols, nrows=nrows, squeeze=False, subplot_kw={"projection": ccrs.PlateCarree()})
     else:
-        ax = plt.gca()
-        ax.set_aspect("equal")
-        img = ax.contourf(longr, latgr, intensity, levels=50, cmap="viridis")
-    ax.set_xlim(np.min(longr), np.max(longr))
-    ax.set_ylim(np.min(latgr), np.max(latgr))
-    plt.title(title)
-    ax.set_xlabel("Latitude")
-    ax.set_ylabel("Longitude")
-    plt.colorbar(img, ax=ax, label="Probability")
+        fig, axs = plt.subplots(ncols=ncols, nrows=nrows, squeeze=False)
+    
+    if len(intensities) % 2 == 1:
+        axs.flat[-1].set_axis_off()
 
-    def mark(lat, lon, color, label, label_on_map):
-        ax.scatter(lon, lat, c=color, label=label)
-        if label_on_map:
-            ax.annotate(label_on_map, (lon, lat), ha="center", c="white")
+    fig.set_figwidth(12)
+    fig.set_figheight(6 * nrows)
 
-    if mark_max:
-        max_idx = np.unravel_index(np.argmax(intensity), intensity.shape)
-        print(f"{title} max: {latgr[max_idx]}, {longr[max_idx]}")
-        print(f"{title} there are {len(np.where(np.ravel(intensity) == intensity[np.unravel_index(np.argmax(intensity), intensity.shape)])[0])} max values")
-        mark(latgr[max_idx], longr[max_idx], "red", "max", f"{latgr[max_idx]:.4f}, {longr[max_idx]:.4f}")
+    for i, (latgr, longr, intensity, title, markers, mark_max) in enumerate(intensities):
+        ax = axs.flat[i]
+        if HAS_CARTOPY and use_cartopy:
+            img = ax.contourf(longr, latgr, intensity, levels=50, cmap="viridis", transform=ccrs.PlateCarree())
 
-    for mname, ((mlat, mlon), mcolor) in markers.items():
-        mark(mlat, mlon, mcolor, mname, mname)
+            ax.set_aspect("equal")
+            gl = ax.gridlines(draw_labels=True, dms=False, x_inline=False, y_inline=False)
+            gl.top_labels = False
+            gl.right_labels = False
 
-    ax.legend()
-    plt.tight_layout()
+            ax.add_feature(cfeature.BORDERS, linestyle="-", edgecolor="white", linewidth=1)
+            ax.add_feature(cfeature.COASTLINE, edgecolor="white", linewidth=1)
+        else:
+            ax.set_aspect("equal")
+            img = ax.contourf(longr, latgr, intensity, levels=50, cmap="viridis")
+        ax.set_xlim(np.min(longr), np.max(longr))
+        ax.set_ylim(np.min(latgr), np.max(latgr))
+        ax.set_title(title)
+        ax.set_xlabel("Latitude")
+        ax.set_ylabel("Longitude")
+        fig.colorbar(
+            img,
+            cax=ax.inset_axes([1.05, 0, 0.05, 1.0]),
+            label="Probability",
+        )
 
-    plt.savefig(f"{out}{title}.png")
-    plt.close()
+        def mark(lat, lon, color, label, label_on_map):
+            ax.scatter(lon, lat, c=color, label=label)
+            if label_on_map:
+                ax.annotate(label_on_map, (lon, lat), ha="center", c="white")
 
+        if mark_max:
+            max_idx = np.unravel_index(np.argmax(intensity), intensity.shape)
+            print(f"{title} max: {latgr[max_idx]}, {longr[max_idx]}")
+            print(f"{title} there are {len(np.where(np.ravel(intensity) == intensity[np.unravel_index(np.argmax(intensity), intensity.shape)])[0])} max values")
+            mark(latgr[max_idx], longr[max_idx], "red", "max", f"{latgr[max_idx]:.4f}, {longr[max_idx]:.4f}")
+
+        for mname, ((mlat, mlon), mcolor) in markers.items():
+            mark(mlat, mlon, mcolor, mname, mname)
+
+        ax.legend()
+
+# TODO: maybe support OSM output? https://wiki.openstreetmap.org/wiki/Heat_maps
 
 def run_tdoa(
     recordings: list[tdoa.TDoAPositionedRecording],
@@ -143,13 +161,21 @@ def run_tdoa(
     if markers is None:
         markers = {}
 
-    for r in recordings:
-        fig, ax = plt.subplots()
-        ax.set_title(f"Spectrogram {r.name}")
-        r.plot_spectrogram(fig, ax)
-        plt.tight_layout()
-        plt.savefig(f"out/{r.name} spec.png")
-        plt.close()
+    ncols = 2
+    with matplotlib.backends.backend_pdf.PdfPages("out/TDoA spectrograms.pdf") as pdf:
+        for rec_chunk in tools.iter_chunks(recordings, 4):
+            nrows = calc_nrows(ncols, len(rec_chunk))
+            fig, axs = plt.subplots(ncols=ncols, nrows=nrows)
+            if len(rec_chunk) % 2 == 1:
+                axs.flat[-1].set_axis_off()
+            fig.set_figwidth(16)
+            fig.set_figheight(5 * nrows)
+            for i, r in enumerate(rec_chunk):
+                axs.flat[i].set_title(f"Spectrogram {r.name}")
+                r.plot_spectrogram(fig, axs.flat[i])
+            plt.tight_layout()
+            pdf.savefig()
+            plt.close()
 
     tdoa_algo = tdoa.TDoAAlgorithmSimple()
 
@@ -186,25 +212,48 @@ def run_tdoa(
     def gen_rec_markers(recs):
         return {rec.name if rec.name is not None else "unknown": ((rec.lat, rec.lon), "blue") for rec in recs}
 
-    _plot_tdoa_heatmap("out/", latgr, longr, intensity, "TDoA", markers | gen_rec_markers(recordings))
+    heatmaps = []
+
+    heatmaps.append((latgr, longr, intensity, "TDoA", markers | gen_rec_markers(recordings), True))
     if propmodel is not None:
-        _plot_tdoa_heatmap("out/", latgr, longr, intensity_corrected, "TDoA (corrected)", markers | gen_rec_markers(recordings))
+        heatmaps.append((latgr, longr, intensity_corrected, "TDoA (corrected)", markers | gen_rec_markers(recordings), True))
     if intensity_split is not None:
-        _plot_tdoa_heatmap("out/", latgr, longr, intensity_split, "TDoA (split)", markers | gen_rec_markers(recordings))
+        heatmaps.append((latgr, longr, intensity_split, "TDoA (split)", markers | gen_rec_markers(recordings), True))
         if propmodel is not None:
-            _plot_tdoa_heatmap("out/", latgr, longr, intensity_split_corrected, "TDoA (split, corrected)", markers | gen_rec_markers(recordings))
+            heatmaps.append((latgr, longr, intensity_split_corrected, "TDoA (split, corrected)", markers | gen_rec_markers(recordings), True))
 
-    for (r1id, r2id), intensity in intensities.items():
-        rec1 = tdoa_run.get_rec(r1id)
-        rec2 = tdoa_run.get_rec(r2id)
-        _plot_tdoa_heatmap("out/", latgr, longr, intensity, f"TDoA {rec1.name} - {rec2.name}", markers | gen_rec_markers([rec1, rec2]), mark_max=False)
+    _run_tdoa_heatmap_plot(heatmaps, 1, True)
+    plt.tight_layout()
+    plt.savefig(f"out/TDoA heatmaps.pdf")
+    plt.close()
 
-        fig, ax = plt.subplots()
-        ax.set_title(f"Correlation {rec1.name} - {rec2.name}")
-        tdoa_run.plot_correlation(fig, ax, r1id, r2id)
-        plt.tight_layout()
-        plt.savefig(f"out/TDoA {rec1.name} - {rec2.name} correlation.png")
-        plt.close()
+    heatmaps = []
+    with matplotlib.backends.backend_pdf.PdfPages("out/TDoA correlations.pdf") as pdf:
+        for intensities_chunk in tools.iter_chunks(intensities.items(), 4):
+            ncols = 2
+            nrows = calc_nrows(ncols, len(intensities_chunk))
+            fig, axs = plt.subplots(ncols=ncols, nrows=nrows)
+            if len(intensities_chunk) % 2 == 1:
+                axs.flat[-1].set_axis_off()
+            fig.set_figwidth(12)
+            fig.set_figheight(4 * nrows)
+            for i, ((r1id, r2id), intensity) in enumerate(intensities_chunk):
+                rec1 = tdoa_run.get_rec(r1id)
+                rec2 = tdoa_run.get_rec(r2id)
+                heatmaps.append((latgr, longr, intensity, f"TDoA {rec1.name} - {rec2.name}", markers | gen_rec_markers([rec1, rec2]), False))
+
+                axs.flat[i].set_title(f"Correlation {rec1.name} - {rec2.name}")
+                tdoa_run.plot_correlation(fig, axs.flat[i], r1id, r2id)
+            plt.tight_layout()
+            pdf.savefig()
+            plt.close()
+
+    with matplotlib.backends.backend_pdf.PdfPages("out/TDoA correlation heatmaps.pdf") as pdf:
+        for heatmaps_chunk in tools.iter_chunks(heatmaps, 4):
+            _run_tdoa_heatmap_plot(heatmaps_chunk, 2, True)
+            plt.tight_layout()
+            pdf.savefig()
+            plt.close()
 
     return (
         latgr,
