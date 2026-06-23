@@ -50,18 +50,36 @@ def prepare_recs(recs: list[tdoa.TDoAPositionedRecording]):
 
     return recs
 
+_KIWIRECORDER_REC_REGEX = r"\d{4}\d{2}\d{2}T\d{2}\d{2}\d{2}Z_\d+_([^_]+)_iq"
 
-def _recs_from_files(files: list[str], locs: dict[str, tuple[float, float]]):
+def _kiwirecorder_fname_name(name: str):
+    return re.sub(r"-", "_", name)
+
+def _recs_from_kiwirecorder_files(files: list[str], locs: dict[str, tuple[float, float]], locs_nameonly = False):
     recordings = []
     for fname in files:
         with open(fname, "rb") as f:
-            m = re.search(r"\d{4}\d{2}\d{2}T\d{2}\d{2}\d{2}Z_\d+_([^_]+)_iq", fname)
+            m = re.search(_KIWIRECORDER_REC_REGEX, fname)
+            rx_name = m.group(1) if m is not None else None
+            if locs_nameonly and rx_name is None:
+                raise Exception(f"could not match filename of recording {fname} and locs_nameonly is True, so the name is required")
             try:
-                recordings.append(tdoa.TDoAPositionedRecording.from_recording(kiwiwavreader.read_kiwiwav(f), *locs[fname], name=m.group(1) if m is not None else None))
+                rx_coords = locs[fname if not locs_nameonly else rx_name]
+                recordings.append(tdoa.TDoAPositionedRecording.from_recording(kiwiwavreader.read_kiwiwav(f), *rx_coords, name=rx_name))
             except Exception:
                 print(f"error reading recording {fname}, ignoring")
                 print(traceback.format_exc())
     return recordings
+
+def _recs_from_directtdoa_dir(dir: str, directtdoa_db: str):
+    with open(directtdoa_db, "r", encoding="utf-8") as f:
+        directtdoa_db = json.loads(f.read())
+    wavs = [str(fp) for fp in pathlib.Path(dir).glob("*.wav")]
+    return _recs_from_kiwirecorder_files(
+        wavs,
+        {_kiwirecorder_fname_name(entry["id"]): (float(entry["lat"]), float(entry["lon"])) for entry in directtdoa_db},
+        locs_nameonly=True,
+    )
 
 def _recs_from_kiwirecorder_dir(dir: str, wavs: list[str] | None = None):
     if wavs is None:
@@ -78,13 +96,13 @@ def _recs_from_kiwirecorder_dir(dir: str, wavs: list[str] | None = None):
     locs = {}
     files = []
     for fname in wavs:
-        m = re.match(r"\d{4}\d{2}\d{2}T\d{2}\d{2}\d{2}Z_\d+_([^_]+)_iq", fname)
+        m = re.match(_KIWIRECORDER_REC_REGEX, fname)
         fp = str(pathlib.Path(dir) / fname)
-        name = re.sub(r"-", "_", m.group(1))
+        name = _kiwirecorder_fname_name(m.group(1))
         locs[fp] = rxmap[name]
         files.append(fp)
 
-    return _recs_from_files(files, locs)
+    return _recs_from_kiwirecorder_files(files, locs)
 
 def calc_nrows(ncols, nitems):
     nrows = math.ceil(nitems / ncols)
